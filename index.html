@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>미니미 생존 게임</title>
+<style>
+  body { font-family: sans-serif; }
+  #map { display: grid; grid-template-columns: repeat(13, 60px); grid-gap: 2px; position:relative;}
+  .cell { width:60px; height:60px; text-align:center; line-height:30px; cursor:pointer; position:relative; }
+  .상품 { background-color: skyblue; }
+  .자연물 { background-color: lightgreen; }
+  .몬스터 { background-color: lightcoral; }
+  .unknown { background-color: black; }
+  .minimi-indicator { position:absolute; width:10px; height:10px; border-radius:50%; background:white; top:10px; left:10px; }
+  #log { border:1px solid #000; height:150px; overflow-y:scroll; padding:2px; margin-top:10px;}
+  #status { margin-bottom:10px; }
+  #actions { margin-bottom:10px; }
+  button { margin-right:5px; margin-top:3px; }
+  #craft-panel { border:1px solid #888; padding:5px; margin-top:5px; display:inline-block; vertical-align:top; }
+  #combat-panel { border:1px solid #444; padding:5px; margin-top:5px; display:none; }
+  #nextTurnBtn {
+  appearance: none;         /* 일반 */
+  padding: 10px 20px;   
+  font-size: 16px;      
+  margin-top: 15px;     
+  cursor: pointer;
+  border-radius: 5px;
+  background-color: orange;
+  color: white;
+  border: none;
+  transition: transform 0.1s;
+}
+
+#nextTurnBtn:hover {
+  transform: scale(1.05); 
+}
+
+</style>
+</head>
+<body>
+
+<h2>미니미 생존 게임</h2>
+<div id="help-container" style="position:fixed; top:10px; right:10px; z-index:100;">
+  <button id="helpBtn">도움말</button>
+
+  <div id="helpPopup" style="
+       display:none;
+       position:absolute;
+       top:35px;
+       right:0;
+       width:480px;
+       background: #f5f5f5;
+       border:1px solid #888;
+       padding:10px;
+       font-size:14px;
+       box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+       line-height: 1.7;
+  ">
+    <div style="text-align:right;">
+      <button id="closeHelp" style="font-size:12px; padding:0 5px;">X</button>
+    </div>
+    <strong>미니미 게임 설명서</strong><br>
+    - 게임 목표: 30턴동안 미니미를 생존시키기<br>
+    - 패배 조건: 모든 미니미가 사망할 경우 게임 오버<br>
+    - 허기: 1턴당 개별 +3. 개별 최종 10이 되면 사망한다.<br>
+    - 체력: 개별 15. 몬스터 공격에 영향을 받는다. 0이되면 사망한다.<br>
+    - 턴: 10턴이 하루. 간이 잠자리가 있을 경우 10턴마다 한번 (아침마다) 모든 미니미의 체력이 회복된다.<br>
+    - 행동력: 턴당 개별 행동력 2.<br>
+    - 전투 행동력: 전투의 경우 턴당 개별 행동력 1. 모두 사용하면 몬스터의 턴이 된다.<br>
+    - 이동: 인접 칸 클릭 (상하 이동 시 사다리 필요). 이동력 1을 소모한다. 한 턴에 한 칸만 이동 가능하다.<br>
+    - 미니미의 시야: 시력이 좋지 않은 미니미는 상하좌우 한칸씩만 볼 수 있다. 한번 가본 칸은 기억한다.<br>
+    - 검정색 칸: 아직 가보지 않은 칸이다. 인접할 경우 칸의 색을 알 수 있다. <br>
+    - 초록색 칸: 자연물칸이다. 이끼와 벌레등을 채집해 식량을 얻을 수 있다.<br>
+    - 파란색 칸: 상품칸이다. 상품을 분해하여 자원과 식량을 얻을 수 있다.<br>
+    - 빨간색 칸: 몬스터가 있는 칸이다. 전투가 시작되고 승리시 식량을 얻을 수 있다.<br>
+    - 제작: 사다리/간이잠자리/거대방패를 만들 수 있다. 행동력 2 소모<br>
+    - 사다리: 위층, 아래층 칸에 이동하는데 사용한다. 제작시 종이 1개가 소모된다.<br>
+    - 간이 잠자리: 미니미의 체력을 회복하는데 사용한다. 제작시 종이 2개가 소모된다.<br>
+    - 거대 방패: 전투 시 방어를 하는데 사용한다. 제작시 플라스틱 1개가 소모된다.<br>
+    - 돌(전투에서 사용): 개당 공격력 4~6 <br>
+    - 맨손 공격: 공격력 2~3 <br>
+    - 분해: 상품/자연물 클릭 후 분해. 행동력 3 소모<br>
+    - 전투: 몬스터 클릭 후 공격 또는 방어<br>
+    - 턴 종료: 턴 넘기기 버튼 클릭<br>
+    - 사망 조건: 허기가 다 찼을 경우, 체력이 0이 되었을경우.
+  </div>
+</div>
+
+
+<div id="status">
+  턴: <span id="turn">1</span>/30 |
+  행동력: <span id="ap">0</span>/<span id="maxAp">0</span> |
+  허기: <span id="totalHunger">0</span>/<span id="maxHunger">0</span><br>
+
+  <span id="minimiStatus">미니미 상태</span><br>
+  자원 - 종이: <span id="paper">0</span>, 플라스틱: <span id="plastic">0</span>, 돌: <span id="stone">0</span>, 식량: <span id="food">0</span><br>
+  인벤토리 - 사다리: <span id="invLadder">0</span>, 간이잠자리: <span id="invShelter">0</span>, 거대방패: <span id="invShield">0</span>
+</div>
+
+<div id="actions">
+  <div id="craft-panel">
+    <h4>제작</h4>
+    <button onclick="craft('ladder')">사다리(종이1)</button>
+    <button onclick="craft('shelter')">간이 잠자리(종이2)</button>
+    <button onclick="craft('shield')">거대 방패(플라스틱1)</button>
+  </div>
+
+  <div id="combat-panel">
+    <h4>전투 행동</h4>
+    <div id="monster-list"></div>
+    <button onclick="attackStone()">돌 공격</button>
+    <button onclick="attackHand()">맨손 공격</button>
+    <button onclick="combatDefend()">방어</button>
+    <button onclick="combatEndTurn()">턴 넘기기</button>
+    <button onclick="combatFlee()">도주</button>
+    전투 행동력: <span id="combatAp">0</span>
+  </div>
+</div>
+
+<div id="game-container" style="display:flex; gap:10px; align-items:flex-start;margin-top: 30px;">
+
+  <!-- 좌측 맵 -->
+  <div>
+    <div id="map"></div>
+    <button id="nextTurnBtn" onclick="nextTurn()">턴 넘기기</button>
+  </div>
+
+  <!-- 우측 로그+결정패널 -->
+  <div style="flex-shrink:0; width:250px; display:flex; flex-direction:column; gap:5px;">
+    <div id="log" style="height:500px; overflow-y:auto; border:1px solid #000; padding:5px;">      <div id="start-container">
+  <button id="startBtn">게임 시작</button>
+</div></div>
+    
+    <div id="log-decision-panel" style="display:none; margin-top:5px;">
+      <button id="btnNormalDisassemble">분해(채집)</button>
+      <button id="btnRecruit">분해 후 미니미 영입</button>
+      <button id="btnFoodify">분해 후 미니미 식량화</button>
+      <button id="btnHold">보류</button>
+
+    </div>
+  </div>
+
+</div>
+
+
+
+
+<script>
+const FLOOR=7, COL=13;
+let currentFloor=3, currentPos=6;
+let minimi=[
+  {name:'미니미1', hp:15, hunger:0},
+  {name:'미니미2', hp:15, hunger:0},
+  {name:'미니미3', hp:15, hunger:0}
+];
+let ap=minimi.length*2;
+let food=0, paper=0, plastic=0, stone=0;
+let inventory={ladder:0, shelter:0, shield:0};
+
+let map=[];
+let player = {
+  x: 4,           // 시작 위치
+  y: 0,
+  inventory: {
+    ladder: 1,    // 시작할 때 사다리 1개 보유
+    food: 0,
+    miniMe: 0
+  }
+};
+let prevPos={floor:2,pos:6};
+let inCombat=false;
+let monster = {
+  hp: 0,
+  ap: 1,       // 한 턴당 행동력 1
+  count: 1     // 몬스터 수, 랜덤 1~2
+};
+let monsters = []; // 현재 전투 중 몬스터들 배열
+let combatAP=0;
+let defending=false;   // 🔹 추가
+let turn=1;
+let pendingDecision = false;
+
+const helpBtn = document.getElementById('helpBtn');
+const helpPopup = document.getElementById('helpPopup');
+const closeHelp = document.getElementById('closeHelp');
+
+// 클릭하면 팝업 토글
+helpBtn.addEventListener('click', ()=>{
+  helpPopup.style.display = (helpPopup.style.display === 'block') ? 'none' : 'block';
+});
+
+// X 버튼 클릭하면 닫기
+closeHelp.addEventListener('click', ()=>{
+  helpPopup.style.display = 'none';
+});
+
+
+const logDiv=document.getElementById('log');
+
+const logDecisionPanel = document.getElementById('log-decision-panel');
+
+document.getElementById('startBtn').addEventListener('click', () => {
+    startGame(); // 게임 초기화
+    document.getElementById('start-container').remove(); // 버튼 제거
+});
+
+
+
+
+function updateCombatUI(){
+  document.getElementById('combatAp').textContent = combatAP;
+
+  // 몬스터 체력 표시
+  const monsterHpSpan = document.getElementById('monsterHp');
+  monsterHpSpan.innerHTML = monsters.map(m => `${m.name}: ${Math.max(m.hp,0)}`).join('<br>');
+}
+
+document.getElementById('btnHold').onclick = () => {
+    const cell = map[currentFloor][currentPos];
+    if(!cell.pendingResource) return;
+    cell.pendingResource.status = 'hold'; // 보류 상태
+    closeDecisionPanel();
+    addLog("분해 보류 → 다음 방문 시 다시 선택 가능");
+};
+
+
+
+
+function addLog(msg){
+  const p=document.createElement('p'); p.textContent=msg; logDiv.appendChild(p);
+  logDiv.scrollTop = logDiv.scrollHeight;
+}
+
+function startGame() {
+
+    gameStarted = true;
+    // 플레이어 위치 초기화
+    currentFloor = 3;
+    currentPos = 6;
+
+    // 미니미 상태 초기화
+    minimi = [
+      {name:'미니미1', hp:15, hunger:0},
+      {name:'미니미2', hp:15, hunger:0},
+      {name:'미니미3', hp:15, hunger:0}
+    ];
+
+    // 사다리 1개 지급
+    inventory.ladder = 1;
+
+    // 행동력 초기화
+    ap = minimi.length * 2;
+
+    // 맵 초기화 및 시야 열기
+    initMap();
+    openInitialVision();
+    updateMapVisibility();
+
+    // 상태 표시 업데이트
+    updateStatus();
+
+    // 로그 출력
+    addLog("게임 시작! 미니미 3마리, 사다리 1개를 가지고 시작합니다.");
+    addLog("총 30턴을 버텨주세요! 모든 미니미가 사망하면 게임이 오버됩니다.");
+    addLog("★ 안내: 이동은 인접 칸 클릭, 위 또는 아래층으로 이동하려면 사다리가 필요합니다. 전투는 몬스터 클릭 후 행동, 제작/분해는 좌측 버튼 사용. 이동력을 모두 소모하려 턴을 넘기려면 '턴 넘기기' 버튼 클릭. --> 더 자세한 설명을 보려면 우측 상단 도움말을 이용하시기바랍니다. 즐겜!");
+}
+
+
+// --- 맵 초기화 ---
+function initMap(){
+  const mapDiv=document.getElementById('map');
+  mapDiv.innerHTML='';
+  map=[];
+
+  for(let f=0; f<FLOOR; f++){
+    map[f]=[];
+
+    for(let c=0;c<COL;c++){
+      const cell=document.createElement('div');
+
+      // --- 타입 확률 생성 ---
+      const rand=Math.floor(Math.random()*100)+1;
+      let type;
+      if(rand<=40) type='자연물';
+      else if(rand<=75) type='상품';
+      else type='몬스터';
+
+      map[f][c]={
+        type:type,
+        visited:false,
+        seen:false,     // 🔹 모든 칸 숨김
+        depleted:false,
+        pendingResource:null,
+        element:cell
+      };
+
+      // 셀 클릭 이벤트
+      cell.className='cell unknown';
+      cell.onclick=()=>exploreCell(f,c);
+      mapDiv.appendChild(cell);
+    }
+  }
+
+  // 시작 칸만 보이게
+  const startCell = map[currentFloor][currentPos];
+  startCell.depleted = true;
+  startCell.type = 'empty';
+  startCell.visited = true;
+  startCell.seen = false; // 🔹 false 유지, 안 보임
+}
+
+
+
+function openInitialVision(){
+
+  const dirs = [
+    [0,0],   // 현재칸
+    [0,1],
+    [0,-1],
+    [1,0],
+    [-1,0]
+  ];
+
+  dirs.forEach(d=>{
+    const nf=currentFloor+d[0];
+    const nc=currentPos+d[1];
+
+    if(map[nf] && map[nf][nc]){
+      map[nf][nc].seen = false;
+    }
+  });
+}
+
+
+// --- 시야 및 미니미 표시 ---
+function updateMapVisibility(){
+  for(let f=0; f<FLOOR; f++){
+    for(let c=0; c<COL; c++){
+      const cell = map[f][c];
+      cell.element.innerHTML='';
+
+      if(!gameStarted){
+        // 스타트 전: 모두 안 보이게
+        cell.element.className='cell unknown';
+        cell.element.style.backgroundColor='';
+        continue;
+      }
+
+
+
+      const isCurrent = (f===currentFloor && c===currentPos);
+      const nearHorizontal = (f===currentFloor && Math.abs(c-currentPos)<=1);
+      const nearVertical = (c===currentPos && Math.abs(f-currentFloor)<=1);
+
+      // 1. 시야 갱신
+      if(isCurrent || nearHorizontal || nearVertical){
+        cell.seen = true;
+      }
+
+      // 색상 처리
+      if(cell.depleted){
+        cell.element.className='cell';
+        cell.element.style.backgroundColor='gray'; // 🔹 시작칸도 여기 포함
+      } 
+      else if(f===currentFloor && c===currentPos){
+        // 현재 미니미 위치
+        cell.element.className='cell '+cell.type;
+        cell.element.style.backgroundColor=''; // 원래 타입 색
+      }
+      else if(cell.seen){
+        cell.element.className='cell '+cell.type;
+        cell.element.style.backgroundColor='';
+      }
+      else{
+        cell.element.className='cell unknown';
+        cell.element.style.backgroundColor='';
+      }
+
+
+
+      // 3. 미니미 숫자 표시
+      if(isCurrent && minimi.length>0){
+        const count=document.createElement('div');
+        count.textContent=minimi.length;
+        count.style.position='absolute';
+        count.style.top='50%';
+        count.style.left='50%';
+        count.style.transform='translate(-50%,-50%)';
+        count.style.fontSize='18px';
+        count.style.fontWeight='bold';
+        count.style.color='white';
+        count.style.textShadow='0 0 4px black';
+        cell.element.appendChild(count);
+      }
+    }
+  }
+}
+
+
+
+
+
+function getTotalHunger(){
+  return minimi.reduce((sum,m)=>sum+m.hunger,0);
+}
+
+
+// --- 상태 업데이트 (개별 미니미 표시) ---
+function updateStatus(){
+  document.getElementById('turn').textContent = turn;
+
+  const maxAp = minimi.length*2;
+  document.getElementById('ap').textContent = ap;
+  document.getElementById('maxAp').textContent = maxAp;
+
+
+
+  const totalHunger = getTotalHunger();
+  const maxHunger = minimi.length*10;
+
+  // 🔹 허기 화면 표시 시 소수점 1자리로 고정
+  document.getElementById('totalHunger').textContent = totalHunger.toFixed(1);
+  document.getElementById('maxHunger').textContent = maxHunger.toFixed(1);
+
+  document.getElementById('food').textContent=food;
+  document.getElementById('paper').textContent=paper;
+  document.getElementById('plastic').textContent=plastic;
+  document.getElementById('stone').textContent=stone;
+  document.getElementById('invLadder').textContent=inventory.ladder;
+  document.getElementById('invShelter').textContent=inventory.shelter;
+  document.getElementById('invShield').textContent=inventory.shield;
+
+  const miniStatus=document.getElementById('minimiStatus');
+  if(minimi.length===0){ 
+    miniStatus.textContent="모든 미니미 사망!"; 
+    return; 
+  }
+  // 🔹 각 미니미 허기 표시 소수점 1자리로
+  miniStatus.textContent = minimi.map(m=>`${m.name}: ${m.hp}/15, 허기:${m.hunger.toFixed(1)}/10`).join(' | ');
+}
+
+let gameStarted = false;  // 🔹 전역 변수 추가
+// --- 이동 ---
+function exploreCell(floor, col) {
+    if(!gameStarted){
+        addLog("먼저 게임 시작 버튼을 눌러주세요!");
+        return;
+    }
+
+    if(inCombat){
+        addLog("전투 중에는 이동할 수 없습니다");
+        return;
+    }
+
+    const horizontalMove = (floor === currentFloor && Math.abs(col - currentPos) === 1);
+    const verticalMove = (col === currentPos && Math.abs(floor - currentFloor) === 1);
+
+    if(!horizontalMove && !verticalMove){
+        addLog("인접 칸만 이동 가능합니다");
+        return;
+    }
+
+    
+
+    // 사다리/행동력 차감
+    if(verticalMove){
+        if(inventory.ladder <= 0){
+            addLog("사다리가 필요합니다");
+            return;
+        }
+        inventory.ladder--;
+        ap -= 1;
+        addLog("사다리 사용 → 행동력 -1");
+    }
+
+    ap -= 1;  // 기본 이동 행동력 차감
+    prevPos = {floor: currentFloor, pos: currentPos};
+    currentFloor = floor;
+    currentPos = col;
+    addLog("칸 이동 완료 → 행동력 1 소모");
+
+    updateMapVisibility();
+    updateStatus();
+
+    const cell = map[floor][col];
+
+  if(cell.pendingResource && cell.pendingResource.status !== 'done'){
+        addLog("이전에 남긴 자원이 있습니다. 분해 여부를 선택하세요");
+        showDecisionPanel(cell);
+        return;
+    }
+
+    // 몬스터 칸 처리
+    if(cell.type === '몬스터'){
+        if(!inCombat) handleMonster();
+        return;
+    }
+
+    // 자연/상품 칸 새로 탐색
+    if(!cell.depleted){
+        switch(cell.type){
+            case '상품':
+                handleProduct();
+                break;
+            case '자연물':
+                handleNature();
+                break;
+        }
+    } else {
+        addLog("이미 탐색한 칸입니다");
+    }
+}
+
+
+
+
+
+// --- 전투 턴 넘기기 버튼 핸들러 ---
+function combatEndTurn(){
+  if(!inCombat){ addLog("전투 중이 아닙니다"); return; }
+  if(combatAP <= 0){ addLog("이미 행동력 없음"); return; }
+
+  addLog(`전투 턴 종료 → 행동력 ${combatAP} 모두 소모`);
+  combatAP = 0;        // 남은 전투 행동력 모두 소진
+  updateCombatUI();
+  
+  // 몬스터 턴 진행
+  monsterTurn();
+
+  // 전투 행동력 초기화
+  combatAP = minimi.length;
+  updateCombatUI();
+}
+
+
+
+
+// --- 상품/자연물 ---
+function handleProduct(){
+  const cell = map[currentFloor][currentPos];
+
+  const roll=Math.floor(Math.random()*6)+1;
+
+  if(roll===1 || roll===2){
+    cell.pendingResource={type:'paperFood', amount:1};
+    addLog("상품 발견: 종이+식량 / 분해하시겠습니까?");
+    openDecisionPanel();
+  }
+  else if(roll===3){
+    cell.pendingResource={type:'plasticFood', amount:1};
+    addLog("상품 발견: 플라스틱+식량 / 분해하시겠습니까?");
+    openDecisionPanel();
+  }
+  else if(roll===4){
+    cell.pendingResource={type:'stonePaper', amount:1};
+    addLog("상품 발견: 돌+종이 / 분해하시겠습니까?");
+    openDecisionPanel();
+  }
+   else if(roll===5){
+    cell.pendingResource={type:'minimi', amount:1};
+    cell.type = 'minimiBox'; // 🔹 여기를 반드시 설정
+    addLog("상품 발견: 미니미 상자 / 분해하시겠습니까?");
+  }
+  else{
+    cell.pendingResource={type:'random', amount:1};
+    addLog("상품 발견: 랜덤 상자 / 분해하시겠습니까?");
+    openDecisionPanel();
+  }
+  showDecisionPanel(cell);
+
+}
+
+function handleNature(){
+
+  const cell = map[currentFloor][currentPos];
+  const roll=Math.floor(Math.random()*6)+1;
+
+  if(roll<=4){
+    const moss=Math.floor(Math.random()*6)+3; // 3~8
+    cell.pendingResource={type:'moss', amount:moss};
+    addLog(`이끼 ${moss}개 발견 / 분해(채집) 하시겠습니까?`);
+    openDecisionPanel();
+  }
+  else{
+    const bug=Math.floor(Math.random()*6)+2; // 2~7
+    cell.pendingResource={type:'bug', amount:bug};
+    addLog(`벌레 ${bug}마리 발견 / 분해(채집) 하시겠습니까?`);
+    openDecisionPanel();
+  }
+  // 자연물 타입 표시
+  cell.type = 'nature';
+
+  showDecisionPanel(cell);
+}
+
+function openDecisionPanel(){
+  if(pendingDecision) return;
+  pendingDecision = true;
+  logDecisionPanel.style.display = 'block';
+}
+
+function closeDecisionPanel(){
+  pendingDecision = false;
+  logDecisionPanel.style.display = 'none';
+}
+
+
+
+
+// --- 몬스터 ---
+function handleMonster() {
+  inCombat = true;
+
+  const monsterCount = Math.floor(Math.random() * 2) + 1; // 1~2마리
+  monsters = [];
+
+  for(let i=0; i<monsterCount; i++){
+    monsters.push({
+      name: `몬스터${i+1}`,
+      hp: Math.floor(Math.random() * 4) + 12, // 12~15
+      ap: 1
+    });
+  }
+
+  combatAP = minimi.length;
+
+  document.getElementById('combat-panel').style.display = 'inline-block';
+
+  updateCombatUI();
+
+  addLog(`몬스터 출현! ${monsters.map(m=>m.name+' HP:'+m.hp).join(', ')}. 당신의 턴입니다.`);
+}
+
+
+
+
+
+// --- 전투 버튼 ---
+function combatAttack(){
+  if(!inCombat){ addLog("전투 중이 아닙니다"); return; }
+  if(stone<=0){ addLog("돌이 없으면 공격 불가"); return; }
+  if(combatAP<=0){ addLog("전투 행동력 부족"); return; }
+  monster.hp-=5; stone--; combatAP--; addLog(`미니미 돌 공격! 몬스터 체력 -5`);
+  monsterTurn();
+  document.getElementById('combatAp').textContent=combatAP;
+  checkCombatEnd();
+}
+
+
+
+
+function attackStone(){
+  if(!inCombat){ addLog("전투 중 아님"); return; }
+  if(stone <= 0){ addLog("돌 없음"); return; }
+  if(combatAP <= 0){ addLog("행동력 부족"); return; }
+
+  const mon = monsters[selectedMonsterIndex];  // 선택된 몬스터
+  const damage = Math.floor(Math.random() * 3) + 4; // 4~6
+  mon.hp -= damage;
+  stone--;
+  combatAP--;
+
+  addLog(`돌 공격 → ${mon.name} 체력 -${damage} (남은 ${Math.max(mon.hp,0)})`);
+
+  // hp <=0이면 몬스터 제거
+  if(mon.hp <= 0){
+    addLog(`${mon.name} 처치!`);
+    monsters = monsters.filter(m => m.hp > 0);
+    selectedMonsterIndex = 0;
+  }
+
+  updateCombatUI();
+
+  // 행동력 0이면 바로 몬스터 턴
+  if(combatAP <= 0){
+    addLog("미니미 행동력 소진 → 몬스터 턴 시작");
+    monsterTurn();
+    combatAP = minimi.length; // 다음 턴 초기화
+  }
+
+  checkCombatEnd();
+}
+
+
+
+function attackHand(){
+  if(!inCombat){ addLog("전투 중 아님"); return; }
+  if(combatAP <= 0){ addLog("행동력 부족"); return; }
+
+  const mon = monsters[selectedMonsterIndex];  // 선택한 몬스터
+  const damage = Math.floor(Math.random() * 2) + 2; // 2~3 랜덤
+
+  mon.hp -= damage;
+  combatAP--;
+
+  addLog(`맨손 공격 → ${mon.name} 체력 -${damage} (남은 ${Math.max(mon.hp,0)})`);
+
+  if(mon.hp <= 0){
+    addLog(`${mon.name} 처치!`);
+    monsters = monsters.filter(m => m.hp > 0);
+    selectedMonsterIndex = 0;
+  }
+
+  updateCombatUI();
+
+  // 행동력 0일 때만 몬스터 턴
+  if(combatAP <= 0){
+    addLog("미니미 행동력 소진 → 몬스터 턴 시작");
+    monsterTurn();
+    combatAP = minimi.length; // 다음 미니미 턴 행동력 초기화
+  }
+
+  checkCombatEnd();
+}
+
+
+updateCombatUI()
+
+document.getElementById('combatAp').textContent=combatAP;
+
+
+
+
+function combatDefend(){
+
+  if(!inCombat){ addLog("전투 중이 아닙니다"); return; }
+  if(inventory.shield<=0){ addLog("방패 없으면 방어 불가"); return; }
+  if(combatAP<=0){ addLog("전투 행동력 부족"); return; }
+
+  combatAP--;
+
+  defending = true;   // 🔹 방어 상태 ON
+
+  addLog("방어 태세 돌입 → 이번 몬스터 공격 방어 판정");
+
+  updateCombatUI();
+
+  if(combatAP<=0){
+
+    monsterTurn();
+
+    combatAP = minimi.length;
+
+    addLog("몬스터 턴 종료 → 전투 행동력 재충전");
+
+    updateCombatUI();
+  }
+}
+
+
+
+function combatFlee(){
+  addLog("도주! 이전 칸으로 이동");
+  currentFloor=prevPos.floor; currentPos=prevPos.pos;
+  inCombat=false;
+  document.getElementById('combat-panel').style.display='none';
+  updateMapVisibility();
+  updateStatus();
+}
+
+function monsterAttack(){
+
+  let damage = 3;
+
+  if(defending){
+
+    if(Math.random() < 0.33){
+      damage = 0;
+      addLog("방어 성공 → 피해 없음");
+    }else{
+      addLog("방어 실패");
+    }
+
+    defending = false; // 1회성
+  }
+
+  player.hp -= damage;
+
+  addLog(`몬스터 공격 → 피해 ${damage}`);
+}
+
+
+// 몬스터 턴
+function monsterTurn(){
+  if(!inCombat || monsters.length === 0) return;
+
+  for(let i=0; i<monsters.length; i++){
+    const mon = monsters[i];
+    if(mon.ap <= 0) continue;
+    if(minimi.length === 0) break;
+
+    const targetIndex = Math.floor(Math.random() * minimi.length);
+    const target = minimi[targetIndex];
+
+    const damage = Math.floor(Math.random() * 5) + 2; // 2~6
+    target.hp -= damage;
+    mon.ap--;
+
+    addLog(`${mon.name} 공격 → ${target.name} 피해 ${damage}, 남은 체력 ${Math.max(target.hp,0)}`);
+  }
+
+  // 죽은 미니미 로그
+    const deadMinimi = minimi.filter(m => m.hp <= 0);
+    deadMinimi.forEach(m => addLog(`${m.name} 사망!`));
+
+
+  // 죽은 미니미 제거
+  minimi = minimi.filter(m => m.hp > 0);
+
+  // 다음 턴을 위해 몬스터 AP 초기화
+  monsters.forEach(m => m.ap = 1);
+
+  // 🔹 몬스터 턴 끝나면 미니미 행동력 항상 초기화
+  combatAP = minimi.length;
+  addLog("몬스터 턴 종료 → 미니미 행동력 초기화");
+
+  updateCombatUI();
+  updateStatus();
+  checkCombatEnd();
+}
+
+
+let selectedMonsterIndex = 0;
+
+function updateCombatUI(){
+  document.getElementById('combatAp').textContent = combatAP;
+
+  const monsterListDiv = document.getElementById('monster-list');
+  monsterListDiv.innerHTML = '';
+
+  monsters.forEach((m, idx) => {
+    const btn = document.createElement('button');
+    btn.textContent = `${m.name} HP:${Math.max(m.hp,0)}`;
+    btn.onclick = ()=>{ selectedMonsterIndex = idx; addLog(`${m.name} 선택`) };
+    if(idx === selectedMonsterIndex) btn.style.border = '2px solid yellow';
+    monsterListDiv.appendChild(btn);
+  });
+}
+
+
+let originalMonsterCount = 0; // 전역 변수
+
+function startCombat(monsterList){
+  monsters = monsterList;
+  inCombat = true;
+  originalMonsterCount = monsters.length; // 전투 시작 시 몬스터 수 저장
+  document.getElementById('combat-panel').style.display='block';
+  addLog(`전투 시작! 몬스터 ${originalMonsterCount}마리 등장`);
+}
+
+
+
+// 전투 종료 확인
+function checkCombatEnd(){
+  if(monsters.every(m => m.hp <= 0)){
+    inCombat = false;
+    document.getElementById('combat-panel').style.display='none';
+    
+    // 남은 몬스터 수 확인
+    let monsterCount = monsters.length; // 이미 0이므로 원래 수 필요
+    if(monsterCount === 0) monsterCount = 1; // 안전 처리
+
+    // 보상 계산
+    let minFood, maxFood;
+    if(monsterCount === 1){
+      minFood = 1; maxFood = 4;
+    } else if(monsterCount === 2){
+      minFood = 2; maxFood = 6;
+    } else {
+      minFood = 1; maxFood = 6;
+    }
+
+    const reward = Math.floor(Math.random() * (maxFood - minFood + 1)) + minFood;
+    food += reward;
+
+    addLog(`모든 몬스터 처치! 식량 ${reward} 획득`);
+
+
+    // 🔹 몬스터 칸 회색 처리
+    const cell = map[currentFloor][currentPos];
+    cell.depleted = true;      // 회색 표시
+    cell.type = 'empty';       // 원래 몬스터 타입 제거
+    updateMapVisibility();
+  }
+}
+
+
+//--행동력 차감--//
+function useAP(cost){
+  player.ap -= cost;
+  addLog(`행동력 ${cost} 차감 (남은 AP: ${player.ap})`);
+  updateStatus();
+
+  if(player.ap <= 0){
+    monsterTurn();
+  }
+}
+
+
+
+// --- 제작/설치/분해 ---
+function craft(item){
+
+  if(!gameStarted){
+    addLog("게임을 시작하려면 먼저 '게임 시작' 버튼을 눌러주세요!");
+    return;  // 제작 실행 막기
+  }
+
+  if(ap < 2){
+    addLog("행동력 부족 → 제작 불가");
+    return;
+  }
+
+  let success=false;
+  let 부족로그="";   // ← 이것도 추가해야 안전
+
+  switch(item){
+
+    case 'ladder':
+      if(paper>=1){
+        paper -= 1;
+        inventory.ladder += 1;
+        success = true;
+        addLog("사다리 1개 제작 완료 (종이 1 사용)");
+      }else{
+        부족로그 = `종이 ${1 - paper}개 부족 -> 사다리 제작 실패`;
+      }
+      break;
+
+    case 'shelter':
+      if(paper>=2){
+        paper -= 2;
+        inventory.shelter++;
+        success = true;
+        addLog("간이 잠자리 1개 제작 완료 (종이 2 사용)");
+      }else{
+        부족로그 = `종이 ${2 - paper}개 부족 -> 잠자리 제작 실패`;
+      }
+      break;
+
+    case 'shield':
+      if(plastic>=1){
+        plastic -= 1;
+        inventory.shield++;
+        success = true;
+        addLog("거대 방패 1개 제작 완료 (플라스틱 1 사용)");
+      }else{
+        부족로그 = `플라스틱 ${1 - plastic}개 부족 -> 거대 방패 제작 실패`;
+      }
+      break;
+  }
+
+  if(success){
+    // 🔹 직접 AP 차감
+    ap -= 2;
+    addLog(`행동력 2 소모 (남은 AP: ${ap})`);
+  }else{
+    addLog(`제작 실패 → ${부족로그}`);
+  }
+
+  updateStatus();  // 🔹 바로 갱신
+}
+
+function confirmDisassemble(){
+
+  disassemble();
+
+  closeDecisionPanel();
+}
+
+function cancelDisassemble(){
+
+  addLog("분해하지 않고 지나갑니다");
+
+  const cell = map[currentFloor][currentPos];
+
+  cell.pendingResource = null;   // 다시 못 분해
+  cell.depleted = true;          // 회색 고정
+
+  closeDecisionPanel();
+
+  updateMapVisibility();
+}
+
+
+
+
+
+let totalMinimiCount = minimi.length; // 기존 미니미 수로 초기화
+
+
+function disassemble(mode='normal') {
+    if(ap < 3){
+        addLog("행동력 부족 → 분해 불가");
+        return;
+    }
+
+    ap -= 3;
+    addLog("행동력 3 소모 → 분해");
+
+    const cell = map[currentFloor][currentPos];
+
+    if(!cell.pendingResource){
+        addLog("분해할 자원이 없습니다");
+        return;
+    }
+
+    const res = cell.pendingResource.type;
+
+    // 🔹 미니미 상자 처리
+    if(cell.type === 'minimiBox') {
+        const miniCount = Math.floor(Math.random()*2)+1;
+
+        if(mode === 'recruit'){
+            for(let i=0;i<miniCount;i++){
+                totalMinimiCount++;
+                minimi.push({ name:'미니미'+totalMinimiCount, hp:15, hunger:0 });
+            }
+            const paperCount = Math.floor(Math.random()*2)+1;
+            paper += paperCount;
+            addLog(`분해 후 미니미 영입 → 미니미 +${miniCount}, 종이 +${paperCount}`);
+        }
+        else if(mode === 'foodify'){
+            const foodGain = miniCount * 3;
+            food += foodGain;
+            addLog(`분해 후 미니미 식량화 → 미니미 ${miniCount}마리 → 식량 +${foodGain}`);
+        }
+
+        // 완료 처리
+        cell.pendingResource = null;
+        cell.depleted = true;
+        cell.type = 'empty';
+        updateStatus();
+        updateMapVisibility();
+        return;  // 일반 상자 코드 실행 방지
+    }
+
+    // 🔹 일반 상자 처리
+    let logText = "분해 완료 → ";
+
+    if(res==='paperFood'){
+        const paperAmount = Math.floor(Math.random()*2) + 1; 
+        paper += paperAmount;
+        food += 2;
+        logText += `종이 +${paperAmount}, 식량 +2`;
+    }
+    else if(res==='plasticFood'){
+        const plasticAmount = Math.floor(Math.random()*2) + 1;
+        plastic += plasticAmount;
+        food += 2;
+        logText += `플라스틱 +${plasticAmount}, 식량 +2`;
+    }
+    else if(res==='stonePaper'){
+        const stoneAmount = Math.floor(Math.random()*2) + 1;
+        const paperAmount = Math.floor(Math.random()*2) + 1;
+        stone += stoneAmount;
+        paper += paperAmount;
+        logText += `돌 +${stoneAmount}, 종이 +${paperAmount}`;
+    }
+    else if(res==='random'){
+        paper += 3; stone +=3; plastic +=3; food +=3;
+        logText += "잭팟! 종이+3, 돌+3, 플라스틱+3, 식량+3";
+    }
+    else if(res==='moss'){
+        const gain = round(cell.pendingResource.amount * 0.6, 1);
+        food += gain;
+        logText += `이끼 ${cell.pendingResource.amount}개 채집 → 식량 +${gain}`;
+    }
+    else if(res==='bug'){
+        const gain = round(cell.pendingResource.amount * 0.6667, 1);
+        food += gain;
+        logText += `벌레 ${cell.pendingResource.amount}마리 채집 → 식량 +${gain}`;
+    }
+
+    addLog(logText);
+
+    // 완료 처리
+    cell.pendingResource = null;
+    cell.type = 'empty';
+    cell.depleted = true;
+    updateStatus();
+    updateMapVisibility();
+}
+
+
+
+
+// --- 분해 선택지 열기 ---
+function showDecisionPanel(cell){
+  if(!cell.pendingResource) return;
+
+  pendingDecision = true;
+  logDecisionPanel.style.display = 'block';
+
+  const res = cell.pendingResource;
+
+  // 버튼 DOM
+  const btnNormal = document.getElementById('btnNormalDisassemble');
+  const btnRecruit = document.getElementById('btnRecruit');
+  const btnFoodify = document.getElementById('btnFoodify');
+
+  // --- 버튼 초기화 (전부 숨김) ---
+  btnNormal.style.display = 'none';
+  btnRecruit.style.display = 'none';
+  btnFoodify.style.display = 'none';
+
+  // --- 타입별 선택지 ---
+  if(res.type === 'minimi'){
+    // 미니미 전용 선택지
+    btnRecruit.style.display = 'inline-block';
+    btnFoodify.style.display = 'inline-block';
+  }
+  else{
+    // 일반 자원
+    btnNormal.style.display = 'inline-block';
+  }
+
+  // --- 버튼 이벤트 ---
+  btnNormal.onclick = () => processDisassemble(cell);
+  btnRecruit.onclick = () => processRecruit(cell);
+  btnFoodify.onclick = () => processFoodify(cell);
+
+  document.getElementById('btnCancel').onclick = () => {
+    addLog("분해하지 않음 → 칸에 그대로 남김");
+    closeDecisionPanel();
+  };
+}
+
+
+// --- 분해 처리 ---
+function processDisassemble(cell){
+  if(ap < 3){
+    addLog("행동력 부족 → 분해 불가");
+    return;
+  }
+
+  ap -= 3;
+  addLog(`분해 완료 → 행동력 3 소모`);
+
+  // 실제 자원 적용
+  const res = cell.pendingResource;
+  if(res.type === 'paperFood') { paper++; food++; }
+  else if(res.type === 'plasticFood') { plastic++; food++; }
+  else if(res.type === 'stonePaper') { stone++; paper++; }
+  else if(res.type === 'moss') { food += res.amount; }
+  else if(res.type === 'bug') { food += res.amount; }
+  else if(res.type === 'minimi') { minimi.push({name:`미니미${minimi.length+1}`, hp:15, hunger:0}); }
+
+  // 칸 상태 업데이트
+  cell.pendingResource = null;
+  cell.depleted = true;
+  cell.type = 'empty';
+
+  closeDecisionPanel();
+  updateMapVisibility();
+  updateStatus();
+}
+
+// --- 미니미 영입 ---
+function processRecruit(cell){
+  if(ap < 3){ addLog("행동력 부족 → 분해 불가"); return; }
+  ap -= 3;
+  minimi.push({name:`미니미${minimi.length+1}`, hp:15, hunger:0});
+  addLog("미니미 영입 완료 → 행동력 3 소모");
+
+  cell.pendingResource = null;
+  cell.depleted = true;
+  cell.type = 'empty';
+
+  closeDecisionPanel();
+  updateMapVisibility();
+  updateStatus();
+}
+
+// --- 미니미 식량화 ---
+function processFoodify(cell){
+  if(ap < 3){ addLog("행동력 부족 → 분해 불가"); return; }
+  ap -= 3;
+  food += 3; // 예시, 미니미 1마리당 식량 3
+  addLog("미니미 식량화 → 식량 +3, 행동력 3 소모");
+
+  cell.pendingResource = null;
+  cell.depleted = true;
+  cell.type = 'empty';
+
+  closeDecisionPanel();
+  updateMapVisibility();
+  updateStatus();
+}
+
+
+
+
+
+
+
+function checkGameOver(){
+
+  if(minimi.length <= 0){
+
+    addLog("모든 미니미가 사망했습니다… 게임 오버");
+
+    alert("게임 오버\n모든 미니미가 사망했습니다.");
+
+    // 🔹 입력 차단
+    inCombat = true;
+
+    // 버튼 비활성화
+    document.querySelectorAll("button").forEach(btn=>{
+      btn.disabled = true;
+    });
+  }
+}
+
+
+
+
+// --- 턴 종료 ---
+function nextTurn(){
+
+  if(!gameStarted){
+    addLog("먼저 게임 시작 버튼을 눌러주세요!");
+    return;
+  }
+
+  turn++;   // 턴 증가
+  addLog(`턴 ${turn} 시작`);
+  
+  checkDailyShelterRecovery(); // 여기서 호출 필수
+  updateStatus();
+
+  // 행동력 초기화
+  ap = minimi.length * 2;
+
+
+  if(inCombat){
+    addLog("전투 중에는 턴을 넘길 수 없습니다");
+    return;
+  }
+
+
+  // --- 허기 증가 & 식량 분배 ---
+  const usedFood = distributeFood(); // 소수점 0.1 단위 반영
+  addLog(`미니미들이 총 ${usedFood.toFixed(1)}개 식량을 섭취했습니다`);
+
+
+  // --- 허기 초과 체크 & 사망 처리 ---
+  minimi.forEach(m => {
+    if(m.hunger >= 10){
+      addLog(`${m.name} 허기 초과! 사망`);
+      m.hp = 0;
+    }
+  });
+  minimi = minimi.filter(m => m.hp > 0);
+
+  checkGameOver();
+
+  // --- 턴 종료 시 행동력/이동력 초기화 ---
+  ap = minimi.length * 2;
+
+  checkDailyShelterRecovery();
+
+  updateStatus();
+  updateMapVisibility();
+
+  if(turn >= 30){
+    addLog("축하합니다! 30턴 생존! 게임에서 승리하셨습니다!");
+    alert("축하합니다! 30턴 생존! 게임에서 승리하셨습니다!");
+  }
+}
+
+
+function checkDailyShelterRecovery(){
+  if(turn % 10 === 0){          // 10턴마다
+    if(inventory.shelter > 0){
+      minimi.forEach(m => m.hp = 15);
+      addLog(`★ 간이 잠자리 효과 발동! 모든 미니미 체력 회복`);
+      updateStatus();
+    } else {
+      addLog(`★ 간이 잠자리 없음 → 회복 불가`);
+    }
+  }
+}
+
+
+
+
+function isHungerEqual(){
+
+  if(minimi.length === 0) return true;
+
+  const first = minimi[0].hunger;
+
+  return minimi.every(m => m.hunger === first);
+}
+
+function round(value, decimals=1){
+  return Math.round(value * Math.pow(10, decimals)) / Math.pow(10, decimals);
+}
+
+function round(value, decimals=1){
+  return Math.round(value * Math.pow(10, decimals)) / Math.pow(10, decimals);
+}
+
+function distributeFood(){
+  const decimals = 1;
+  let totalFoodUsed = 0;
+
+  // 허기 증가 후 반올림
+  minimi.forEach(m => { m.hunger = round(m.hunger + 4, decimals); });
+  addLog("모든 미니미 허기 +4");
+
+  if(food <= 0) return totalFoodUsed;
+
+  const sameHunger = minimi.every(m => round(m.hunger, decimals) === round(minimi[0].hunger, decimals));
+
+  if(sameHunger){
+    const share = food / minimi.length;
+    minimi.forEach(m => {
+      const reduce = round(share * 4, decimals);
+      m.hunger = Math.max(0, round(m.hunger - reduce, decimals));
+    });
+    const usedFood = round(share * minimi.length, decimals);
+    food = round(food - usedFood, decimals);
+    totalFoodUsed += usedFood;
+    addLog(`균등 분배 → 각 ${round(share, decimals)}개, 총 ${usedFood}개 사용`);
+  }else{
+    const sorted = [...minimi].sort((a,b) => b.hunger - a.hunger);
+    for(const m of sorted){
+      if(food <= 0) break;
+      const needFood = round(m.hunger / 4, decimals);
+      const use = Math.min(needFood, food);
+      // 허기 반영 전 항상 반올림
+      const reduce = round(use*4, decimals);
+      m.hunger = Math.max(0, round(m.hunger - reduce, decimals));
+      food = round(food - use, decimals);
+      totalFoodUsed += use;
+      addLog(`${m.name} 허기 ${m.hunger.toFixed(1)} → 식량 ${use.toFixed(1)}개 섭취`);
+      addLog(`균등 분배 → 각 ${share.toFixed(1)}개, 총 ${usedFood.toFixed(1)}개 사용`);
+
+    }
+  }
+
+  return totalFoodUsed;
+}
+
+
+// --- 초기화 ---
+initMap();openInitialVision(); updateMapVisibility(); updateStatus();
+</script>
+
+</body>
+</html>
