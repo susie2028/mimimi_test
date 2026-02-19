@@ -728,6 +728,8 @@ function combatDefend(){
   if(combatAP<=0){ addLog("전투 행동력 부족"); return; }
 
   combatAP--;
+  inventory.shield--;  // 🔹 방패 차감
+  updateStatus();
 
   defending = true;   // 🔹 방어 상태 ON
 
@@ -793,6 +795,18 @@ function monsterTurn(){
     const target = minimi[targetIndex];
 
     const damage = Math.floor(Math.random() * 5) + 2; // 2~6
+
+    // 방어 적용
+    if(defending){
+        if(Math.random() < 0.33){
+            damage = 0;
+            addLog("방어 성공! 피해 없음");
+        } else {
+            addLog("방어 실패!");
+        }
+        defending = false; // 1회성 방어
+    }
+        
     target.hp -= damage;
     mon.ap--;
 
