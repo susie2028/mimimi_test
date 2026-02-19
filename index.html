@@ -545,6 +545,25 @@ function combatEndTurn(){
   updateCombatUI();
 }
 
+// 전투 중 미니미 데미지 적용 함수 예시
+function applyCombatDamage(minimiIndex, dmg){
+  const m = minimi[minimiIndex];
+  m.hp -= dmg;
+  if(m.hp < 0) m.hp = 0;
+  addLog(`${m.name}이(가) ${dmg} 피해 → HP ${m.hp}`);
+
+  updateStatus();
+
+  // 데미지 적용 후 즉시 게임 오버 체크
+  if(minimi.every(mm => mm.hp <= 0)){
+    addLog("모든 미니미 사망 → 게임 오버");
+    setTimeout(() => {
+      alert("게임 오버! 모든 미니미가 사망했습니다요.");
+      // 필요하면 맵 잠금, 버튼 비활성화 등 추가
+    }, 50); // 로그가 먼저 보이도록 약간 지연
+  }
+}
+
 
 
 
@@ -1265,23 +1284,57 @@ function processFoodify(cell){
 
 
 
-function checkGameOver(){
-
-  if(minimi.length <= 0){
-
-    addLog("모든 미니미가 사망했습니다… 게임 오버");
-
-    alert("게임 오버\n모든 미니미가 사망했습니다.");
-
-    // 🔹 입력 차단
-    inCombat = true;
-
-    // 버튼 비활성화
-    document.querySelectorAll("button").forEach(btn=>{
-      btn.disabled = true;
-    });
+function checkGameOver() {
+  if(minimi.length === 0) {
+    addLog("모든 미니미 사망 → 게임 오버");
+    // 게임 오버 팝업
+    setTimeout(() => {
+      alert("게임 오버! 모든 미니미가 사망했습니다요.");
+      // 여기서 맵이나 버튼 잠금 가능
+    }, 50);
   }
 }
+
+// --- 전투에서 데미지 적용 시 ---
+function applyDamageToMinimi(minimiIndex, dmg){
+  if(minimiIndex >= minimi.length) return;
+  const m = minimi[minimiIndex];
+  m.hp -= dmg;
+  if(m.hp <= 0){
+    removeMinimi(minimiIndex); // 죽으면 제거 후 체크
+  } else {
+    addLog(`${m.name}이(가) ${dmg} 피해 → HP ${m.hp}`);
+    updateStatus();
+  }
+}
+
+// --- 전투 턴 끝날 때 항상 체크 ---
+function endCombatTurn(){
+  updateStatus();
+  checkGameOver(); // 턴이 끝나도 0인지 확인
+}
+
+
+// 미니미 제거 함수에서 바로 체크
+function removeMinimi(index) {
+  const dead = minimi.splice(index,1)[0];
+  addLog(`${dead.name} 사망`);
+  updateStatus();
+  checkGameOver(); // 여기서 바로 게임 오버 확인
+}
+
+// 전투 중 데미지 적용 시
+function applyCombatDamage(minimiIndex, dmg){
+  const m = minimi[minimiIndex];
+  m.hp -= dmg;
+  if(m.hp <= 0){
+    removeMinimi(minimiIndex);
+  } else {
+    addLog(`${m.name}이(가) ${dmg} 피해 → HP ${m.hp}`);
+    updateStatus();
+  }
+}
+
 
 
 
