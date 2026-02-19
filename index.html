@@ -90,7 +90,11 @@
 <div id="status">
   턴: <span id="turn">1</span>/30 |
   행동력: <span id="ap">0</span>/<span id="maxAp">0</span> |
-  허기 총합: <span id="totalHunger">0</span>/<span id="maxHunger">0</span><br>
+  허기 총합: <span id="totalHunger">0</span>/<span id="maxHunger">0</span>
+<div style="width:150px; height:14px; background:#ccc; border:1px solid #888; margin-top:2px;">
+  <div id="totalHungerFill" style="height:100%; width:0%; background:orange; transition:width 0.3s ease;"></div>
+</div>
+
 
   <span id="minimiStatus">미니미 상태</span><br>
   자원 - 종이: <span id="paper">0</span>, 플라스틱: <span id="plastic">0</span>, 돌: <span id="stone">0</span>, 식량: <span id="food">0</span><br>
@@ -415,12 +419,17 @@ function updateStatus(){
 
 
 
-  const totalHunger = getTotalHunger();
-  const maxHunger = minimi.length*10;
+  // 총 허기 계산
+const totalHunger = getTotalHunger();
+const maxHunger = minimi.length*10;
 
-  // 🔹 허기 화면 표시 시 소수점 1자리로 고정
-  document.getElementById('totalHunger').textContent = totalHunger.toFixed(1);
-  document.getElementById('maxHunger').textContent = maxHunger.toFixed(1);
+// 숫자는 그대로
+document.getElementById('totalHunger').textContent = totalHunger.toFixed(1);
+document.getElementById('maxHunger').textContent = maxHunger;
+
+// 게이지 바 비율 업데이트
+const fillPercent = Math.min(100, (totalHunger / maxHunger) * 100);
+document.getElementById('totalHungerFill').style.width = fillPercent + '%';
 
   document.getElementById('food').textContent=food;
   document.getElementById('paper').textContent=paper;
@@ -1141,26 +1150,58 @@ function showDecisionPanel(cell){
 }
 
 
-// --- 분해 처리 ---
+// --- 분해 ---
 function processDisassemble(cell){
   if(ap < 3){
     addLog("행동력 부족 → 분해 불가");
     return;
   }
-
   ap -= 3;
-  addLog(`분해 완료 → 행동력 3 소모`);
 
-  // 실제 자원 적용
   const res = cell.pendingResource;
-  if(res.type === 'paperFood') { paper++; food++; }
-  else if(res.type === 'plasticFood') { plastic++; food++; }
-  else if(res.type === 'stonePaper') { stone++; paper++; }
-  else if(res.type === 'moss') { food += res.amount; }
-  else if(res.type === 'bug') { food += res.amount; }
-  else if(res.type === 'minimi') { minimi.push({name:`미니미${minimi.length+1}`, hp:15, hunger:0}); }
+  let logText = "분해 완료 → 행동력 3 소모, 획득: ";
 
-  // 칸 상태 업데이트
+  if(res.type === 'paperFood') {
+    const paperAmount = Math.floor(Math.random()*3)+1;
+    paper += paperAmount;
+    food += 2;  // 식량 고정
+    logText += `종이 +${paperAmount}, 식량 +2`;
+  }
+  else if(res.type === 'plasticFood') {
+    const plasticAmount = Math.floor(Math.random()*3)+1;
+    plastic += plasticAmount;
+    food += 2;  // 식량 고정
+    logText += `플라스틱 +${plasticAmount}, 식량 +2`;
+  }
+  else if(res.type === 'stonePaper') {
+    const stoneAmount = Math.floor(Math.random()*3)+1;
+    const paperAmount = Math.floor(Math.random()*3)+1;
+    stone += stoneAmount;
+    paper += paperAmount;
+    logText += `돌 +${stoneAmount}, 종이 +${paperAmount}`;
+  }
+  else if(res.type === 'moss') {
+    const gain = Math.round(res.amount * 0.6*10)/10;  // 3/5 소수점 1자리
+    food += gain;
+    logText += `이끼 ${res.amount}개 → 식량 +${gain}`;
+  }
+  else if(res.type === 'bug') {
+    const gain = Math.round(res.amount * 2/3*10)/10;  // 2/3 소수점 1자리
+    food += gain;
+    logText += `벌레 ${res.amount}마리 → 식량 +${gain}`;
+  }
+  else if(res.type === 'minimi') {
+    const miniCount = Math.floor(Math.random()*2)+1;
+    for(let i=0;i<miniCount;i++){
+      minimi.push({name:`미니미${minimi.length+1}`, hp:15, hunger:0});
+    }
+    const paperAmount = Math.floor(Math.random()*3)+1;
+    paper += paperAmount;
+    logText += `미니미 ${miniCount}마리 영입, 종이 +${paperAmount}`;
+  }
+
+  addLog(logText);
+
   cell.pendingResource = null;
   cell.depleted = true;
   cell.type = 'empty';
@@ -1172,10 +1213,17 @@ function processDisassemble(cell){
 
 // --- 미니미 영입 ---
 function processRecruit(cell){
-  if(ap < 3){ addLog("행동력 부족 → 분해 불가"); return; }
+  if(ap < 3){ addLog("행동력 부족 → 영입 불가"); return; }
   ap -= 3;
-  minimi.push({name:`미니미${minimi.length+1}`, hp:15, hunger:0});
-  addLog("미니미 영입 완료 → 행동력 3 소모");
+
+  const miniCount = Math.floor(Math.random()*2)+1;
+  let logText = `미니미 ${miniCount}마리 영입 → 행동력 3 소모`;
+
+  for(let i=0;i<miniCount;i++){
+    minimi.push({name:`미니미${minimi.length+1}`, hp:15, hunger:0});
+  }
+
+  addLog(logText);
 
   cell.pendingResource = null;
   cell.depleted = true;
@@ -1188,10 +1236,14 @@ function processRecruit(cell){
 
 // --- 미니미 식량화 ---
 function processFoodify(cell){
-  if(ap < 3){ addLog("행동력 부족 → 분해 불가"); return; }
+  if(ap < 3){ addLog("행동력 부족 → 식량화 불가"); return; }
   ap -= 3;
-  food += 3; // 예시, 미니미 1마리당 식량 3
-  addLog("미니미 식량화 → 식량 +3, 행동력 3 소모");
+
+  const miniCount = cell.pendingResource.amount || 1;
+  const gain = Math.round(miniCount*3*10)/10; // 1마리당 식량 3
+  food += gain;
+
+  addLog(`미니미 ${miniCount}마리 식량화 → 식량 +${gain}, 행동력 3 소모`);
 
   cell.pendingResource = null;
   cell.depleted = true;
@@ -1201,6 +1253,7 @@ function processFoodify(cell){
   updateMapVisibility();
   updateStatus();
 }
+
 
 
 
