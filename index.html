@@ -421,6 +421,17 @@ function updateStatus(){
   document.getElementById('ap').textContent = ap;
   document.getElementById('maxAp').textContent = maxAp;
 
+  const minimiStatusEl = document.getElementById('minimiStatus');
+  if(minimi.length === 0){
+    minimiStatusEl.textContent = "모든 미니미 사망!";
+    // 팝업 띄우기
+    setTimeout(() => { 
+      alert("게임 오버! 모든 미니미가 사망했습니다요."); 
+    }, 50);
+  } else {
+    minimiStatusEl.textContent = `미니미 상태: ${minimi.map(m => m.name).join(', ')}`;
+  }
+
 
 
   // 총 허기 계산
