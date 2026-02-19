@@ -90,7 +90,7 @@
 <div id="status">
   턴: <span id="turn">1</span>/30 |
   행동력: <span id="ap">0</span>/<span id="maxAp">0</span> |
-  허기: <span id="totalHunger">0</span>/<span id="maxHunger">0</span><br>
+  허기 총합: <span id="totalHunger">0</span>/<span id="maxHunger">0</span><br>
 
   <span id="minimiStatus">미니미 상태</span><br>
   자원 - 종이: <span id="paper">0</span>, 플라스틱: <span id="plastic">0</span>, 돌: <span id="stone">0</span>, 식량: <span id="food">0</span><br>
@@ -806,7 +806,7 @@ function monsterTurn(){
         }
         defending = false; // 1회성 방어
     }
-        
+
     target.hp -= damage;
     mon.ap--;
 
