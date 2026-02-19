@@ -90,10 +90,14 @@
 <div id="status">
   턴: <span id="turn">1</span>/30 |
   행동력: <span id="ap">0</span>/<span id="maxAp">0</span> |
-  허기 총합: <span id="totalHunger">0</span>/<span id="maxHunger">0</span>
-<div style="width:150px; height:14px; background:#ccc; border:1px solid #888; margin-top:2px;">
-  <div id="totalHungerFill" style="height:100%; width:0%; background:orange; transition:width 0.3s ease;"></div>
-</div>
+  허기 총합: 
+  <div style="display:inline-flex; align-items:center; margin-left:5px; margin-right:5px;">
+    <div style="width:150px; height:14px; background:#ccc; border:1px solid #888; margin-right:5px;">
+      <div id="totalHungerFill" style="height:100%; width:0%; background:orange; transition:width 0.3s ease;"></div>
+    </div>
+    <span id="totalHunger">0</span>/<span id="maxHunger">0</span>
+  </div>
+  <br>
 
 
   <span id="minimiStatus">미니미 상태</span><br>
