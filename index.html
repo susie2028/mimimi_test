@@ -569,7 +569,7 @@ function applyCombatDamage(minimiIndex, dmg){
   if(minimi.every(mm => mm.hp <= 0)){
     addLog("모든 미니미 사망 → 게임 오버");
     setTimeout(() => {
-      alert("게임 오버! 모든 미니미가 사망했습니다요.");
+      alert("게임 오버! 모든 미니미가 사망했습니다.");
       // 필요하면 맵 잠금, 버튼 비활성화 등 추가
     }, 50); // 로그가 먼저 보이도록 약간 지연
   }
