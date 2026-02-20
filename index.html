@@ -476,6 +476,12 @@ function exploreCell(floor, col) {
         return;
     }
 
+    if(ap <= 0){
+    addLog("행동력이 부족합니다");
+    return;
+}
+
+
     const horizontalMove = (floor === currentFloor && Math.abs(col - currentPos) === 1);
     const verticalMove = (col === currentPos && Math.abs(floor - currentFloor) === 1);
 
@@ -496,6 +502,12 @@ function exploreCell(floor, col) {
         ap -= 1;
         addLog("사다리 사용 → 행동력 -1");
     }
+
+    if(ap <= 0){
+    addLog("행동력이 부족합니다");
+    return;
+}
+
 
     ap -= 1;  // 기본 이동 행동력 차감
     prevPos = {floor: currentFloor, pos: currentPos};
