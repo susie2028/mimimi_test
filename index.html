@@ -79,7 +79,7 @@
     - 거대 방패: 전투 시 방어를 하는데 사용한다. 제작시 플라스틱 1개가 소모된다.<br>
     - 돌(전투에서 사용): 개당 공격력 4~6 <br>
     - 맨손 공격: 공격력 2~3 <br>
-    - 분해: 상품/자연물 클릭 후 분해. 행동력 3 소모<br>
+    - 분해: 상품/자연물 클릭 후 분해. 행동력 2 소모<br>
     - 전투: 몬스터 클릭 후 공격 또는 방어<br>
     - 턴 종료: 턴 넘기기 버튼 클릭<br>
     - 사망 조건: 허기가 다 찼을 경우, 체력이 0이 되었을경우.
@@ -1187,7 +1187,7 @@ function showDecisionPanel(cell){
 // --- 분해 ---
 function processDisassemble(cell){
 
-  if(ap < 3){
+  if(ap < 2){
     addLog("행동력 부족 → 분해 불가");
     return;
   }
@@ -1195,7 +1195,7 @@ function processDisassemble(cell){
   const res = cell.pendingResource;   // 🔥 먼저 선언
   if(!res) return;
 
-  ap -= 3;
+  ap -= 2;
 
   // 🔥 1단계: 랜덤 먼저 처리
   if(res.type === 'random'){
@@ -1218,7 +1218,7 @@ function processDisassemble(cell){
     }
   }
 
-  let logText = "분해 완료 → 행동력 3 소모, 획득: ";
+  let logText = "분해 완료 → 행동력 2 소모, 획득: ";
 
 
   if(res.type === 'paperFood') {
@@ -1288,11 +1288,11 @@ function processDisassemble(cell){
 
 // --- 미니미 영입 ---
 function processRecruit(cell){
-  if(ap < 3){ addLog("행동력 부족 → 영입 불가"); return; }
-  ap -= 3;
+  if(ap < 2){ addLog("행동력 부족 → 영입 불가"); return; }
+  ap -= 2;
 
   const miniCount = Math.floor(Math.random()*2)+1;
-  let logText = `미니미 ${miniCount}마리 영입 → 행동력 3 소모`;
+  let logText = `미니미 ${miniCount}마리 영입 → 행동력 2 소모`;
 
   for(let i=0;i<miniCount;i++){
     minimi.push({name:`미니미${minimi.length+1}`, hp:15, hunger:0});
@@ -1311,14 +1311,14 @@ function processRecruit(cell){
 
 // --- 미니미 식량화 ---
 function processFoodify(cell){
-  if(ap < 3){ addLog("행동력 부족 → 식량화 불가"); return; }
-  ap -= 3;
+  if(ap < 2){ addLog("행동력 부족 → 식량화 불가"); return; }
+  ap -= 2;
 
   const miniCount = cell.pendingResource.amount || 1;
   const gain = Math.round(miniCount*3*10)/10; // 1마리당 식량 3
   food += gain;
 
-  addLog(`미니미 ${miniCount}마리 식량화 → 식량 +${gain}, 행동력 3 소모`);
+  addLog(`미니미 ${miniCount}마리 식량화 → 식량 +${gain}, 행동력 2 소모`);
 
   cell.pendingResource = null;
   cell.depleted = true;
