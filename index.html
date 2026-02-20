@@ -1186,14 +1186,40 @@ function showDecisionPanel(cell){
 
 // --- 분해 ---
 function processDisassemble(cell){
+
   if(ap < 3){
     addLog("행동력 부족 → 분해 불가");
     return;
   }
+
+  const res = cell.pendingResource;   // 🔥 먼저 선언
+  if(!res) return;
+
   ap -= 3;
 
-  const res = cell.pendingResource;
+  // 🔥 1단계: 랜덤 먼저 처리
+  if(res.type === 'random'){
+
+    const products = [
+      'paperFood',
+      'plasticFood',
+      'stonePaper',
+      'minimi',
+      'jackpot'
+    ];
+
+    const selected = products[Math.floor(Math.random()*products.length)];
+    addLog(`랜덤상자 결과 → ${selected}`);
+
+    res.type = selected;
+
+    if(selected === 'minimi'){
+      cell.type = 'minimiBox';
+    }
+  }
+
   let logText = "분해 완료 → 행동력 3 소모, 획득: ";
+
 
   if(res.type === 'paperFood') {
     const paperAmount = Math.floor(Math.random()*3)+1;
@@ -1233,6 +1259,21 @@ function processDisassemble(cell){
     paper += paperAmount;
     logText += `미니미 ${miniCount}마리 영입, 종이 +${paperAmount}`;
   }
+
+  else if(res.type === 'jackpot') {
+  paper += 3;
+  stone += 3;
+  plastic += 3;
+  food += 3;
+  logText += `잭팟! 전 자원 +3`;
+}
+
+
+
+
+
+
+
 
   addLog(logText);
 
